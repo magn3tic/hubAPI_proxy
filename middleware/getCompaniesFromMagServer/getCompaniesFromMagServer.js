@@ -1,10 +1,11 @@
 const _ = require('lodash');
 const request = require('request');
+const MAGSERVER = process.env.MAGSERVER;
 
 function getCompaniesFromMagServer() {
   let companiesArr = [];
   const getCompanies = new Promise((resolve, reject) => {
-      request('http://dev.magne.tc/api/hubspot/cache/clients.json', (error, response, body) => {
+      request(MAGSERVER + '/api/hubspot/cache/clients.json', (error, response, body) => {
         if (error) {
           reject(error);
         } else {
