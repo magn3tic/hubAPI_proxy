@@ -1,4 +1,4 @@
-# Project Title
+# Hubspot API Proxy
 
 A simple Node/Express Proxy API to be consumed by our portal that is currently hosted by gh-pages. gh-pages is https, so we needed a way to communicate with our portal client as our current lamp server is not SSL certified.
 
