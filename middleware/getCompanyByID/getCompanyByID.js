@@ -12,7 +12,7 @@ function getCompaniesInit(companyIDsArray) {
   getCompanyById(companyIDsArray)
     .then((companyArray) => {
       console.log('promise resolved')
-      fs.writeFile(fileToWrite, companyArray, err => {
+      fs.writeFile('data/' + fileToWrite, companyArray, err => {
         if (err) throw err;
         console.log('saved companyArray: ');
       })
