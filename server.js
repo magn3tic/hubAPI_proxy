@@ -19,6 +19,8 @@ const clientSecret = process.env.HUBCLIENTSECRET;
 const hubAuthInit = process.env.HUBAUTHINIT;
 const callbackURL = process.env.CALLBACKURL;
 const HUBCONTACTSALL = process.env.HUBCONTACTSALL;
+const HUBDEALSALL = process.env.HUBDEALSALL;
+const HUBDEAL = process.env.HUBDEAL;
 
 // Server Env. To share with others switch to 'staging'
 const serverEnv = 'dev';
@@ -29,6 +31,8 @@ var passport = require('passport')
 var OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
 const Qs = require('qs');
 const bodyParser = require('body-parser');
+
+const _ = require('lodash');
 
 server.on('listening', () =>
   console.log(`express proxy application started on ${port}`)
@@ -59,8 +63,8 @@ app.route('/hubAPI')
 
 app.route('/hubContacts')
   .post((req, res) => {
-    if(fs.existsSync(__dirname + '/data/contacts.json')) {
-      console.log('contacts.son already exists, sending file');
+    if (fs.existsSync(__dirname + '/data/contacts.json')) {
+      console.log('contacts.json already exists, sending file');
       res.status(200).send(fs.readFileSync(__dirname + '/data/contacts.json'));
       return
     }
@@ -196,4 +200,100 @@ passport.use('hubspot', new OAuth2Strategy({
     }.bind({ authInfo }))
   }
 ));
+
+app.post('/hubDeals', (req, res) => {
+
+  // if(fs.existsSync(__dirname + '/data/deals.json')) {
+  //   console.log('deals.json already exists, sending file');
+  //   res.status(200).send(fs.readFileSync(__dirname + '/data/deals.json'));
+  //   return
+  // }
+  console.log('req bearer: ', req.body.authorization[0]);
+  let token = req.body.authorization[0];
+  let offset = '';
+  let options = {
+    url: hubAPI + HUBDEALSALL + '?limit=250',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `${token}`,
+      'User-Agent': 'request',
+      Accept: 'application/json',
+    }
+  }
+
+  let deals = [];
+  let tempDealIDsArray = [];
+  var callback = (error, response, body) => {
+    return new Promise((resolve, reject) => {
+      let hasMore = body['has-more'];
+      var info = JSON.parse(body);
+      if (!error && response.statusCode == 200) {
+        deals.push(info);
+        // console.log('successful callback to get deals, deals: ', deals);
+        setTimeout(function () {
+          offset = info['offset'];
+          hasMore = info['has-more'];
+          options.url = hubAPI + HUBDEALSALL + '?&offset=' + offset;
+          console.log('in callback new offset: ', options.url);
+          console.log('hasMore: ', hasMore);
+          if (!hasMore) {
+            console.log('!hasMore: ', hasMore);
+            deals.push(info);
+            fs.writeFile(__dirname + '/data/deals.json', JSON.stringify(deals), err => {
+              if (err) {
+                reject(err => console.log('err in writeFile with deals'));
+              }
+              readJSONFile(__dirname + '/data/deals.json')
+                // .then(json => resolve(res.send(json)))
+                .then(json => {
+                  let tempJsonObj = JSON.parse(json);
+                  // console.log(tempJsonObj.length);
+                  _.forEach(tempJsonObj, val => {
+                    // console.log('deals val: ', val.deals)
+                    _.forEach(val.deals, (obj) => {
+                      // console.log('obj: ', obj);
+                      tempDealIDsArray.push(obj.dealId);
+                    }) 
+                  })
+                })
+                .catch(err => reject(console.log('file written err: ', err)))
+            })
+          }
+          return request(options, callback);
+        }, 100);
+      } else {
+        reject(res.sendStatus(404))
+      }
+    })
+  }
+  request(options, callback)
+})
+
+app.post('/hubDeal/:id', (req, res) => {
+  console.log('req bearer: ', req.body.authorization[0]);
+  let token = req.body.authorization[0];
+  let offset = '';
+  let options = {
+    url: hubAPI + HUBDEAL + req.params.id + '?limit=250',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `${token}`,
+      'User-Agent': 'request',
+      Accept: 'application/json',
+    }
+  }
+
+  var callback = (error, response, body) => {
+    return new Promise((resolve, reject) => {
+      let hasMore = body['has-more'];
+      var info = JSON.parse(body);
+      if (!error && response.statusCode == 200) {
+        resolve(res.status(200).send(info));
+      } else {
+        reject(res.sendStatus(404))
+      }
+    })
+  }
+  request(options, callback)
+})
 
