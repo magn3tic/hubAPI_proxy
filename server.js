@@ -9,6 +9,7 @@ const server = app.listen(port);
 const middleware = require('./middleware');
 const getDeals = middleware.getDeals;
 const readJSONFile = middleware.readJSONFile;
+const getCompanyIdsByDeals = middleware.getCompanyIdsByDeals;
 const hubAuth = middleware.hubAuth;
 const cors = require('cors');
 // Hub constants
@@ -19,8 +20,10 @@ const clientSecret = process.env.HUBCLIENTSECRET;
 const hubAuthInit = process.env.HUBAUTHINIT;
 const callbackURL = process.env.CALLBACKURL;
 const HUBCONTACTSALL = process.env.HUBCONTACTSALL;
+const HUBCOMPANIESALL = process.env.HUBCOMPANIESALL;
 const HUBDEALSALL = process.env.HUBDEALSALL;
 const HUBDEAL = process.env.HUBDEAL;
+const HUBME = process.env.HUBME;
 
 // Server Env. To share with others switch to 'staging'
 const serverEnv = 'dev';
@@ -117,13 +120,14 @@ app.route('/hubContacts')
     request(options, callback)
   })
 
+
 app.route('/hubToken')
   .get((req, res) => {
-    console.log('request for hubspot_token route /hubToken');
+    console.log('request for hubspot_token route /hubToken', req.route);
     if (fs.existsSync('./data/token.json')) {
       readJSONFile('./data/token.json')
         .then(json => res.send(json))
-        .catch(err => console.error(err));
+        .catch(err => console.error('hubToken err readJSONFile: ', err));
     } else {
       res.status(404).send('Not authorized, no token in data/token.json')
     }
@@ -229,32 +233,25 @@ app.post('/hubDeals', (req, res) => {
       var info = JSON.parse(body);
       if (!error && response.statusCode == 200) {
         deals.push(info);
-        // console.log('successful callback to get deals, deals: ', deals);
+        console.log('successful callback to get deals, deals: ', deals);
         setTimeout(function () {
           offset = info['offset'];
           hasMore = info['has-more'];
-          options.url = hubAPI + HUBDEALSALL + '?&offset=' + offset;
-          console.log('in callback new offset: ', options.url);
-          console.log('hasMore: ', hasMore);
+          options.url = hubAPI + HUBDEALSALL + '?includeAssociations=true&properties=dealname&limit=250&offset=' + offset;
+          console.log('options.url: ', options.url);
           if (!hasMore) {
-            console.log('!hasMore: ', hasMore);
-            deals.push(info);
             fs.writeFile(__dirname + '/data/deals.json', JSON.stringify(deals), err => {
               if (err) {
                 reject(err => console.log('err in writeFile with deals'));
               }
               readJSONFile(__dirname + '/data/deals.json')
-                // .then(json => resolve(res.send(json)))
                 .then(json => {
-                  let tempJsonObj = JSON.parse(json);
-                  // console.log(tempJsonObj.length);
-                  _.forEach(tempJsonObj, val => {
-                    // console.log('deals val: ', val.deals)
-                    _.forEach(val.deals, (obj) => {
-                      // console.log('obj: ', obj);
-                      tempDealIDsArray.push(obj.dealId);
-                    }) 
-                  })
+                  // console.log('deals.json: ', json);
+                  // console.log('getCompanyIdsByDeals: ', getCompanyIdsByDeals);
+                  const dealsObj = JSON.parse(json);
+                  // getCompanyIdsByDeals(dealsObj)
+                  // .then(res => console.log('getCompanyIdsByDeals(dealsObj) returned : ', res))
+                  // .catch(err => console.log('err in getCompanyIdsByDeals', err));
                 })
                 .catch(err => reject(console.log('file written err: ', err)))
             })
@@ -285,7 +282,6 @@ app.post('/hubDeal/:id', (req, res) => {
 
   var callback = (error, response, body) => {
     return new Promise((resolve, reject) => {
-      let hasMore = body['has-more'];
       var info = JSON.parse(body);
       if (!error && response.statusCode == 200) {
         resolve(res.status(200).send(info));
@@ -296,4 +292,103 @@ app.post('/hubDeal/:id', (req, res) => {
   }
   request(options, callback)
 })
+
+app.post('/hubMe', (req, res) => {
+  console.log('req for /hubme: ', req);
+  let token = req.body.token;
+  let options = {
+    url: hubAPI + HUBME + req.body.token,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `${token}`,
+      'User-Agent': 'request',
+      Accept: 'application/json',
+    }
+  }
+
+  var callback = (error, response, body) => {
+    console.log('hubme callback body: ', body);
+    return new Promise((resolve, reject) => {
+      var info = JSON.stringify(body);
+      if (!error && response.statusCode == 200) {
+        resolve(res.status(200).send(info));
+      } else {
+        reject(res.sendStatus(404))
+      }
+    })
+  }
+  request(options, callback)
+})
+
+app.route('/hubCompanies')
+  .post((req, res) => {
+    if (fs.existsSync(__dirname + '/data/companies.json')) {
+      console.log('companies.json already exists, sending file');
+      res.status(200).send(fs.readFileSync(__dirname + '/data/companies.json'));
+      return
+    }
+    console.log('req bearer: ', req.body.authorization[0]);
+    let token = req.body.authorization[0];
+    let offset = '';
+    let options = {
+      url: hubAPI + HUBCOMPANIESALL,
+      json: true,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `${token}`,
+        'User-Agent': 'request',
+        Accept: 'application/json',
+      }
+    }
+
+    let companies = [];
+    var callback = (error, response, body) => {
+      if (!body) {
+        console.log('no body in response, response: ', response);
+        console.log('no body: ', body);
+      }
+      return new Promise((resolve, reject) => {
+        let hasMore = body['has-more'];
+        try {
+          var data = body;
+        } catch (e) {
+          console.log('malformed request', e);
+          return res.status(400).send('malformed request: ' + body);
+        }
+        // console.log('data: ', data);
+        if (!error && response.statusCode == 200) {
+          companies.push(data);
+          setTimeout(function () {
+            offset = data['offset'];
+            hasMore = data['has-more'];
+            options.url = hubAPI + HUBCOMPANIESALL + '?properties=lifecyclestage&properties=hubspot_owner_id&properties=hs_lead_status' + '&offset=' + offset;
+            let tempCompaniesArr = [];
+            if (!hasMore) {
+              companies.push(data);
+              const flatten = arr => arr.reduce((a, b) => a.concat(Array.isArray(b) ? flatten(b) : b), []);
+              _.forEach(companies, (val, key) => {
+                tempCompaniesArr.push(val.companies)
+              })
+              tempCompaniesArr = flatten(tempCompaniesArr);
+              const opportunityCompanies = _.filter(tempCompaniesArr, (o)=> {
+                return o.properties.lifecyclestage;
+              })
+              fs.writeFile(__dirname + '/data/companies.json', JSON.stringify(opportunityCompanies), err => {
+                if (err) {
+                  reject(err => console.log('error writing companies.json: ', err));
+                }
+                readJSONFile(__dirname + '/data/companies.json')
+                  .then(json => resolve(res.send(json)))
+                  .catch(err => reject(console.log(err)))
+              })
+            }
+            return request(options, callback);
+          }, 100);
+        } else {
+          reject(res.sendStatus(404))
+        }
+      })
+    }
+    request(options, callback)
+  })
 
