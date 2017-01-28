@@ -10,6 +10,7 @@ const middleware = require('./middleware');
 const getDeals = middleware.getDeals;
 const readJSONFile = middleware.readJSONFile;
 const getCompanyIdsByDeals = middleware.getCompanyIdsByDeals;
+const getCompaniesInit = middleware.getCompaniesInit;
 const hubAuth = middleware.hubAuth;
 const cors = require('cors');
 // Hub constants
@@ -21,6 +22,7 @@ const hubAuthInit = process.env.HUBAUTHINIT;
 const callbackURL = process.env.CALLBACKURL;
 const HUBCONTACTSALL = process.env.HUBCONTACTSALL;
 const HUBCOMPANIESALL = process.env.HUBCOMPANIESALL;
+const HUBGETCOMPANY = process.env.HUBGETCOMPANY;
 const HUBDEALSALL = process.env.HUBDEALSALL;
 const HUBDEAL = process.env.HUBDEAL;
 const HUBME = process.env.HUBME;
@@ -71,7 +73,7 @@ app.route('/hubContacts')
       res.status(200).send(fs.readFileSync(__dirname + '/data/contacts.json'));
       return
     }
-    console.log('req bearer: ', req.body.authorization[0]);
+    // console.log('req bearer: ', req.body.authorization[0]);
     let token = req.body.authorization[0];
     let vidOffset = '';
     let options = {
@@ -123,7 +125,7 @@ app.route('/hubContacts')
 
 app.route('/hubToken')
   .get((req, res) => {
-    console.log('request for hubspot_token route /hubToken', req.route);
+    // console.log('request for hubspot_token route /hubToken', req.route);
     if (fs.existsSync('./data/token.json')) {
       readJSONFile('./data/token.json')
         .then(json => res.send(json))
@@ -344,8 +346,8 @@ app.route('/hubCompanies')
     let companies = [];
     var callback = (error, response, body) => {
       if (!body) {
-        console.log('no body in response, response: ', response);
-        console.log('no body: ', body);
+        // console.log('no body in response, response: ', response);
+        // console.log('no body: ', body);
       }
       return new Promise((resolve, reject) => {
         let hasMore = body['has-more'];
@@ -363,6 +365,7 @@ app.route('/hubCompanies')
             hasMore = data['has-more'];
             options.url = hubAPI + HUBCOMPANIESALL + '?properties=lifecyclestage&properties=hubspot_owner_id&properties=hs_lead_status' + '&offset=' + offset;
             let tempCompaniesArr = [];
+            let companyIDsArr = [];
             if (!hasMore) {
               companies.push(data);
               const flatten = arr => arr.reduce((a, b) => a.concat(Array.isArray(b) ? flatten(b) : b), []);
@@ -370,17 +373,31 @@ app.route('/hubCompanies')
                 tempCompaniesArr.push(val.companies)
               })
               tempCompaniesArr = flatten(tempCompaniesArr);
-              const opportunityCompanies = _.filter(tempCompaniesArr, (o)=> {
+              const opportunityCompanies = _.chain(tempCompaniesArr).filter((o) => {
+                console.log('o: ', o);
+                if(!o) {
+                  return;
+                }
                 return o.properties.lifecyclestage;
               })
-              fs.writeFile(__dirname + '/data/companies.json', JSON.stringify(opportunityCompanies), err => {
-                if (err) {
-                  reject(err => console.log('error writing companies.json: ', err));
-                }
-                readJSONFile(__dirname + '/data/companies.json')
-                  .then(json => resolve(res.send(json)))
-                  .catch(err => reject(console.log(err)))
-              })
+                .map('companyId')
+                .value();
+                console.log('tempCompaniesArr length: ', opportunityCompanies);
+
+                getCompaniesInit(opportunityCompanies, options)
+                .then(companies => {
+                  // console.log('getCompanies returned: ', companies)
+                  fs.writeFile(__dirname + '/data/companies.json', JSON.stringify(companies), err => {
+                    if (err) {
+                      reject(err => console.log('error writing companies.json: ', err));
+                    }
+                    readJSONFile(__dirname + '/data/companies.json')
+                      .then(json => resolve(res.send(json)))
+                      .catch(err => reject(console.log(err)))
+                  })
+                })
+                .catch(err => console.log('getCompanies err: ', err))
+
             }
             return request(options, callback);
           }, 100);
