@@ -296,7 +296,6 @@ app.post('/hubDeal/:id', (req, res) => {
 })
 
 app.post('/hubMe', (req, res) => {
-  console.log('req for /hubme: ', req);
   let token = req.body.token;
   let options = {
     url: hubAPI + HUBME + req.body.token,
@@ -309,7 +308,7 @@ app.post('/hubMe', (req, res) => {
   }
 
   var callback = (error, response, body) => {
-    console.log('hubme callback body: ', body);
+    // console.log('hubme callback body: ', body);
     return new Promise((resolve, reject) => {
       var info = JSON.stringify(body);
       if (!error && response.statusCode == 200) {
@@ -374,7 +373,7 @@ app.route('/hubCompanies')
               })
               tempCompaniesArr = flatten(tempCompaniesArr);
               const opportunityCompanies = _.chain(tempCompaniesArr).filter((o) => {
-                console.log('o: ', o);
+                // console.log('o: ', o);
                 if(!o) {
                   return;
                 }
@@ -382,17 +381,17 @@ app.route('/hubCompanies')
               })
                 .map('companyId')
                 .value();
-                console.log('tempCompaniesArr length: ', opportunityCompanies);
+                // console.log('tempCompaniesArr length: ', opportunityCompanies);
 
                 getCompaniesInit(opportunityCompanies, options)
                 .then(companies => {
                   // console.log('getCompanies returned: ', companies)
-                  fs.writeFile(__dirname + '/data/companies.json', JSON.stringify(companies), err => {
+                  fs.writeFile(__dirname + '/data/companies.json', companies, err => {
                     if (err) {
                       reject(err => console.log('error writing companies.json: ', err));
                     }
                     readJSONFile(__dirname + '/data/companies.json')
-                      .then(json => resolve(res.send(json)))
+                      .then(json => resolve(res.json(json)))
                       .catch(err => reject(console.log(err)))
                   })
                 })

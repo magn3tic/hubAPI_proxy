@@ -34,17 +34,17 @@ function getCompanyById(companyIDsArray, options) {
   const globalArrLen = globalCompanyStore.length;
   let callsComplete = globalArrLen === inputArrLen;
   let index = 0;
+  let headers = options.headers;
   return new Promise((resolve, reject) => {
     _.forEach(companyIDsArray, (companyId) => {
-      options.url = APIBASE + HUBSPOTCOMPANIESEND + companyId;
       ++index;
-      callAPI(options, (err, res, body) => {
+      callAPI({url: APIBASE + HUBSPOTCOMPANIESEND + companyId, headers}, (err, res, body) => {
         if (err) {
           reject(err);
         } else {
-          globalCompanyStore.push(res.body);
+          globalCompanyStore.push(JSON.parse(res.body));
           if (index === globalCompanyStore.length) {
-            resolve(globalCompanyStore)
+            resolve(JSON.stringify(globalCompanyStore))
           }
         }
       })
