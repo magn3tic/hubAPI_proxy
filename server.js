@@ -66,6 +66,39 @@ app.route('/hubAPI')
 
   })
 
+app.route('/contact')
+.post((req, res) => {
+  return new Promise((resolve, reject) => {
+  if(!req.body) {
+    console.log('no body');
+  } else {
+    const userEmail = req.body.email;
+    const contactPath = hubAPI + `contacts/v1/contact/email/${userEmail}/profile`;
+    // console.log('contactPath: ', contactPath);
+    let token = req.body.authorization;
+    let options = {
+      url: contactPath,
+      headers: {
+          'Content-Type': 'application/json',
+          Authorization: `${token}`,
+          'User-Agent': 'request',
+          Accept: 'application/json',
+        }
+    }
+    // console.log('options: ', options)
+    request(options, (error, response, body) => {
+      if(!error) {
+        // console.log('body: ', body);
+        res.status(200).send(body)
+      } else {
+        console.log('error: ', error);
+        reject('user contact error: ', err);
+      }
+    });
+  }
+  }) 
+})
+
 app.route('/hubContacts')
   .post((req, res) => {
     if (fs.existsSync(__dirname + '/data/contacts.json')) {
