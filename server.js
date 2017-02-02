@@ -31,6 +31,10 @@ const HUBME = process.env.HUBME;
 const serverEnv = 'dev';
 // const serverEnv = 'staging';
 
+// Limit api calls to hubspot to adhere to limitaions(10 requests per second)
+const limit = require("simple-rate-limiter");
+const callAPI = limit(require("request")).to(10).per(1000);
+
 // Passport
 var passport = require('passport')
 var OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
@@ -46,8 +50,8 @@ server.on('listening', () =>
 app.options('*', cors())
   .use(cors());
 
-app.use(bodyParser.json()); // for parsing application/json
 app.use(bodyParser.urlencoded({ extended: true })); // for parsing application/x-www-form-urlencoded
+app.use(bodyParser.json()); // for parsing application/json
 
 app.route('/hubAPI/refresh')
   .get((req, res) => {
@@ -328,10 +332,13 @@ app.post('/hubDeal/:id', (req, res) => {
   request(options, callback)
 })
 
-app.post('/hubMe', (req, res) => {
-  let token = req.body.token;
+app.route('/hubMe')
+.post((req, res) => {
+  console.log('req.headers: ', req.headers);
+  let token = req.headers.authorization.replace('Bearer ', '');
+  console.log('/hubMe token: ', token)
   let options = {
-    url: hubAPI + HUBME + req.body.token,
+    url: hubAPI + HUBME + token,
     headers: {
       'Content-Type': 'application/json',
       Authorization: `${token}`,
@@ -341,7 +348,7 @@ app.post('/hubMe', (req, res) => {
   }
 
   var callback = (error, response, body) => {
-    // console.log('hubme callback body: ', body);
+    console.log('hubme callback body: ', body);
     return new Promise((resolve, reject) => {
       var info = JSON.stringify(body);
       if (!error && response.statusCode == 200) {
@@ -439,5 +446,46 @@ app.route('/hubCompanies')
       })
     }
     request(options, callback)
+  })
+
+
+  // this route is not being used currently since hubspot can't find the properties in question.
+
+  app.route('/hubDeleteProps')
+  .post((req, res) => {
+    let token = req.headers.authorization;
+    console.log('/hubDeleteProps token: ', token);
+    // headers
+    let index = 0;
+    let options = {
+      json: true,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `${token}`,
+        'User-Agent': 'request',
+        Accept: 'application/json',
+      }
+    }
+    let headers = options.headers;
+    console.log('req bearer: ', req.body.token);
+    const propertiesToBeDeleted = req.body;
+    _.forEach(propertiesToBeDeleted, (property) => {
+      index++
+      if(!property.startsWith('scope')) {
+        return
+      } else {
+        callAPI({url: hubAPI + 'properties/v1/contacts/properties/named/' + property, headers}, (error, response, body) => {
+          console.log('callAPI returned: ', body);
+        if (error) {
+          console.log('error: ', error);
+        } else {
+          if (index === propertiesToBeDeleted.length) {
+            res.status(200).send('delete was successful');
+          }
+        }
+      })
+        console.log('property: ', property);
+      }
+    })
   })
 
