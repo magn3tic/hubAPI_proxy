@@ -13,6 +13,7 @@ const getCompanyIdsByDeals = middleware.getCompanyIdsByDeals;
 const getCompaniesInit = middleware.getCompaniesInit;
 const hubAuth = middleware.hubAuth;
 const cors = require('cors');
+const https = require('https');
 // Hub constants
 const hubAPI = process.env.HUBAPIBASE;
 const hubAuthToken = process.env.HUBOAUTHTOKEN;
@@ -50,8 +51,8 @@ server.on('listening', () =>
 app.options('*', cors())
   .use(cors());
 
-app.use(bodyParser.urlencoded({ extended: true })); // for parsing application/x-www-form-urlencoded
 app.use(bodyParser.json()); // for parsing application/json
+app.use(bodyParser.urlencoded({ extended: true })); // for parsing application/x-www-form-urlencoded
 
 app.route('/hubAPI/refresh')
   .get((req, res) => {
@@ -71,37 +72,37 @@ app.route('/hubAPI')
   })
 
 app.route('/contact')
-.post((req, res) => {
-  return new Promise((resolve, reject) => {
-  if(!req.body) {
-    console.log('no body');
-  } else {
-    const userEmail = req.body.email;
-    const contactPath = hubAPI + `contacts/v1/contact/email/${userEmail}/profile`;
-    // console.log('contactPath: ', contactPath);
-    let token = req.body.authorization;
-    let options = {
-      url: contactPath,
-      headers: {
-          'Content-Type': 'application/json',
-          Authorization: `${token}`,
-          'User-Agent': 'request',
-          Accept: 'application/json',
-        }
-    }
-    // console.log('options: ', options)
-    request(options, (error, response, body) => {
-      if(!error) {
-        // console.log('body: ', body);
-        res.status(200).send(body)
+  .post((req, res) => {
+    return new Promise((resolve, reject) => {
+      if (!req.body) {
+        console.log('no body');
       } else {
-        console.log('error: ', error);
-        reject('user contact error: ', err);
+        const userEmail = req.body.email;
+        const contactPath = hubAPI + `contacts/v1/contact/email/${userEmail}/profile`;
+        // console.log('contactPath: ', contactPath);
+        let token = req.body.authorization;
+        let options = {
+          url: contactPath,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `${token}`,
+            'User-Agent': 'request',
+            Accept: 'application/json',
+          }
+        }
+        // console.log('options: ', options)
+        request(options, (error, response, body) => {
+          if (!error) {
+            // console.log('body: ', body);
+            res.status(200).send(body)
+          } else {
+            console.log('error: ', error);
+            reject('user contact error: ', err);
+          }
+        });
       }
-    });
-  }
-  }) 
-})
+    })
+  })
 
 app.route('/hubContacts')
   .post((req, res) => {
@@ -333,33 +334,33 @@ app.post('/hubDeal/:id', (req, res) => {
 })
 
 app.route('/hubMe')
-.post((req, res) => {
-  console.log('req.headers: ', req.headers);
-  let token = req.headers.authorization.replace('Bearer ', '');
-  console.log('/hubMe token: ', token)
-  let options = {
-    url: hubAPI + HUBME + token,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `${token}`,
-      'User-Agent': 'request',
-      Accept: 'application/json',
-    }
-  }
-
-  var callback = (error, response, body) => {
-    console.log('hubme callback body: ', body);
-    return new Promise((resolve, reject) => {
-      var info = JSON.stringify(body);
-      if (!error && response.statusCode == 200) {
-        resolve(res.status(200).send(info));
-      } else {
-        reject(res.sendStatus(404))
+  .post((req, res) => {
+    console.log('req.headers: ', req.headers);
+    let token = req.headers.authorization.replace('Bearer ', '');
+    console.log('/hubMe token: ', token)
+    let options = {
+      url: hubAPI + HUBME + token,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `${token}`,
+        'User-Agent': 'request',
+        Accept: 'application/json',
       }
-    })
-  }
-  request(options, callback)
-})
+    }
+
+    var callback = (error, response, body) => {
+      console.log('hubme callback body: ', body);
+      return new Promise((resolve, reject) => {
+        var info = JSON.stringify(body);
+        if (!error && response.statusCode == 200) {
+          resolve(res.status(200).send(info));
+        } else {
+          reject(res.sendStatus(404))
+        }
+      })
+    }
+    request(options, callback)
+  })
 
 app.route('/hubCompanies')
   .post((req, res) => {
@@ -414,16 +415,16 @@ app.route('/hubCompanies')
               tempCompaniesArr = flatten(tempCompaniesArr);
               const opportunityCompanies = _.chain(tempCompaniesArr).filter((o) => {
                 // console.log('o: ', o);
-                if(!o) {
+                if (!o) {
                   return;
                 }
                 return o.properties.lifecyclestage;
               })
                 .map('companyId')
                 .value();
-                // console.log('tempCompaniesArr length: ', opportunityCompanies);
+              // console.log('tempCompaniesArr length: ', opportunityCompanies);
 
-                getCompaniesInit(opportunityCompanies, options)
+              getCompaniesInit(opportunityCompanies, options)
                 .then(companies => {
                   // console.log('getCompanies returned: ', companies)
                   fs.writeFile(__dirname + '/data/companies.json', companies, err => {
@@ -449,9 +450,9 @@ app.route('/hubCompanies')
   })
 
 
-  // this route is not being used currently since hubspot can't find the properties in question.
+// this route is not being used currently since hubspot can't find the properties in question.
 
-  app.route('/hubDeleteProps')
+app.route('/hubDeleteProps')
   .post((req, res) => {
     let token = req.headers.authorization;
     console.log('/hubDeleteProps token: ', token);
@@ -471,21 +472,121 @@ app.route('/hubCompanies')
     const propertiesToBeDeleted = req.body;
     _.forEach(propertiesToBeDeleted, (property) => {
       index++
-      if(!property.startsWith('scope')) {
+      if (!property.startsWith('scope')) {
         return
       } else {
-        callAPI({url: hubAPI + 'properties/v1/contacts/properties/named/' + property, headers}, (error, response, body) => {
+        callAPI({ url: hubAPI + 'properties/v1/contacts/properties/named/' + property, headers }, (error, response, body) => {
           console.log('callAPI returned: ', body);
-        if (error) {
-          console.log('error: ', error);
-        } else {
-          if (index === propertiesToBeDeleted.length) {
-            res.status(200).send('delete was successful');
+          if (error) {
+            console.log('error: ', error);
+          } else {
+            if (index === propertiesToBeDeleted.length) {
+              res.status(200).send('delete was successful');
+            }
           }
-        }
-      })
+        })
         console.log('property: ', property);
       }
     })
+  })
+
+app.route('/hubFormsPurge')
+  .post((req, res) => {
+    const magHubFormId = '80cb8037-3adb-4652-9acc-136771a9b243';
+    const magPortalId = 510975;
+    // build the data object
+    const scopes = encodeURI(JSON.stringify([]));
+    const email = req.body.email;
+    // build the data object
+    // var postData = `email=${req.body.email}&scopes=${scopes}`;
+    let postData = Qs.stringify({
+      email,
+      scopes
+    });
+
+    console.log('postdata: ', postData);
+
+    // set the post options, changing out the HUB ID and FORM GUID variables.
+    var options = {
+      hostname: 'forms.hubspot.com',
+      path: `/uploads/form/v2/${magPortalId}/${magHubFormId}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': postData.length
+      }
+    }
+
+    // set up the request
+    var request = https.request(options, function (response) {
+      console.log("Status: " + response.statusCode);
+      if(response.statusCode >= 200 && response.statusCode <= 300){
+        res.status(200);
+      }
+      console.log("Headers: " + JSON.stringify(response.headers));
+      response.setEncoding('utf8');
+      response.on('data', function (chunk) {
+        console.log('Body: ' + chunk)
+      });
+    });
+
+    request.on('error', function (e) {
+      console.log("Problem with request " + e.message)
+    });
+
+    // post the data
+    request.write(postData);
+    request.end();
+
+  })
+
+app.route('/hubFormsUpdate')
+  .post((req, res) => {
+    console.log('update req: ', req);
+    const magHubFormId = '80cb8037-3adb-4652-9acc-136771a9b243';
+    const magPortalId = 510975;
+    const scopes = encodeURI(JSON.stringify(req.body.scopes));
+    const email = req.body.email;
+    // build the data object
+    // var postData = `email=${req.body.email}&scopes=${scopes}`;
+    let postData = Qs.stringify({
+      email,
+      scopes
+    })
+
+    console.log('postdata: ', postData);
+
+    // set the post options, changing out the HUB ID and FORM GUID variables.
+    var options = {
+      hostname: 'forms.hubspot.com',
+      path: `/uploads/form/v2/${magPortalId}/${magHubFormId}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': postData.length
+      }
+    }
+
+    // set up the request
+    var request = https.request(options, function (response) {
+      console.log("Status: " + response.statusCode);
+      console.log("Headers: " + JSON.stringify(response.headers));
+      if(response.statusCode >= 200 && response.statusCode <= 300){
+        res.status(200);
+      }
+      response.setEncoding('utf8');
+      response.on('data', function (chunk) {
+        console.log('Body: ' + chunk)
+      });
+    });
+
+    request.on('error', function (e) {
+      console.log("Problem with request " + e.message)
+    });
+
+    // post the data
+    request.write(postData);
+    request.end();
+
   })
 
