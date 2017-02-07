@@ -481,7 +481,7 @@ app.route('/hubDeleteProps')
             console.log('error: ', error);
           } else {
             if (index === propertiesToBeDeleted.length) {
-              res.status(200).send('delete was successful');
+              res.sendStatus(200);
             }
           }
         })
@@ -521,7 +521,7 @@ app.route('/hubFormsPurge')
     var request = https.request(options, function (response) {
       console.log("Status: " + response.statusCode);
       if(response.statusCode >= 200 && response.statusCode <= 300){
-        res.status(200);
+        res.sendStatus(200);
       }
       console.log("Headers: " + JSON.stringify(response.headers));
       response.setEncoding('utf8');
@@ -572,7 +572,8 @@ app.route('/hubFormsUpdate')
       console.log("Status: " + response.statusCode);
       console.log("Headers: " + JSON.stringify(response.headers));
       if(response.statusCode >= 200 && response.statusCode <= 300){
-        res.status(200);
+        console.log('success conditional hit status: ', response.statusCode);
+        res.sendStatus(200);
       }
       response.setEncoding('utf8');
       response.on('data', function (chunk) {
