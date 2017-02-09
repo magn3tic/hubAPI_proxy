@@ -69,9 +69,6 @@ app.route('/hubAPI/refresh')
 // This route and its functions should be abstracted into services/middleware when going to prod
 app.route('/hubAPI')
   .post((req, res, next) => {
-    // readJSONFile('./data/companies.json')
-    //   .then(json => res.send(json))
-    //   .catch(err => console.error(err))
     console.log('req: ', req.body.variable_name);
 
   })
@@ -84,7 +81,6 @@ app.route('/contact')
       } else {
         const userEmail = req.body.email;
         const contactPath = hubAPI + `contacts/v1/contact/email/${userEmail}/profile`;
-        // console.log('contactPath: ', contactPath);
         let token = req.body.authorization;
         let options = {
           url: contactPath,
@@ -95,10 +91,8 @@ app.route('/contact')
             Accept: 'application/json',
           }
         }
-        // console.log('options: ', options)
         request(options, (error, response, body) => {
           if (!error) {
-            // console.log('body: ', body);
             res.status(200).send(body)
           } else {
             console.log('error: ', error);
@@ -116,7 +110,6 @@ app.route('/hubContacts')
       res.status(200).send(fs.readFileSync(__dirname + '/data/contacts.json'));
       return
     }
-    // console.log('req bearer: ', req.body.authorization[0]);
     let token = req.body.authorization[0];
     let vidOffset = '';
     let options = {
@@ -136,7 +129,6 @@ app.route('/hubContacts')
         var info = JSON.parse(body);
         if (!error && response.statusCode == 200) {
           contacts.push(info);
-          // console.log('successful callback to get contacts, contacts: ', contacts);
           setTimeout(function () {
             vidOffset = info['vid-offset'];
             hasMore = info['has-more'];
@@ -168,7 +160,6 @@ app.route('/hubContacts')
 
 app.route('/hubToken')
   .get((req, res) => {
-    // console.log('request for hubspot_token route /hubToken', req.route);
     if (fs.existsSync('./data/token.json')) {
       readJSONFile('./data/token.json')
         .then((json) => {
