@@ -27,10 +27,12 @@ const HUBGETCOMPANY = process.env.HUBGETCOMPANY;
 const HUBDEALSALL = process.env.HUBDEALSALL;
 const HUBDEAL = process.env.HUBDEAL;
 const HUBME = process.env.HUBME;
+const HUBFORMID = process.env.HUBFORMID;
+const HUBPORTALID = process.env.HUBPORTALID;
 
 // Server Env. To share with others switch to 'staging'
-const serverEnv = 'dev';
-// const serverEnv = 'staging';
+// const serverEnv = 'dev';
+const serverEnv = 'staging';
 
 // Limit api calls to hubspot to adhere to limitaions(10 requests per second)
 const limit = require("simple-rate-limiter");
@@ -166,7 +168,9 @@ app.route('/hubToken')
     // console.log('request for hubspot_token route /hubToken', req.route);
     if (fs.existsSync('./data/token.json')) {
       readJSONFile('./data/token.json')
-        .then(json => res.send(json))
+        .then((json) => {
+
+          res.send(json)})
         .catch(err => console.error('hubToken err readJSONFile: ', err));
     } else {
       res.status(404).send('Not authorized, no token in data/token.json')
@@ -176,13 +180,13 @@ app.route('/hubToken')
 app.route('/hubLogout')
   .get((req, res) => {
     console.log('logout requested');
-    fs.rmdir(__dirname + '/data', (err) => {
+    fs.unlink(__dirname + '/data/token.json', (err) => {
       if (err && err.code === 'ENOENT') {
         console.log('unlink err: ENOENT ', err);
         res.sendStatus(204);
       } else {
         console.log('successfully logged out');
-        res.sendStatus(202);
+        res.sendStatus(200);
       }
     })
   })
@@ -202,7 +206,7 @@ app.get('/auth/hubspot/callback', passport.authenticate('hubspot', { session: fa
     fs.writeFile('data/token.json', JSON.stringify(req.user), err => {
       if (err) throw err;
       console.log('saved token: ', JSON.parse(fs.readFileSync('data/token.json')));
-      res.redirect(303, (serverEnv === 'dev') ? 'http://localhost:3000/#/token' : 'http://magfam.surge.sh/#/token');
+      res.redirect(303, (serverEnv === 'dev') ? 'http://localhost:3000/#/token' : 'http://mag.surge.sh/#/token');
     });
   } else {
     console.log('callback err: ', err);
@@ -219,8 +223,6 @@ passport.use('hubspot', new OAuth2Strategy({
   callbackURL
 },
   function (accessToken, refreshToken, profile, done) {
-    // console.log('accessToken',accessToken)
-    // console.log('profile', profile)
     var authInfo = {
       accessToken,
       refreshToken
@@ -228,15 +230,6 @@ passport.use('hubspot', new OAuth2Strategy({
     request('https://app.hubspot.com/oauth/authorize/' + accessToken, function (error, response, body, authInfo) {
       if (!error) {
         console.log('successful Oauth 2.0 connection')
-        //console.log(JSON.parse(body))
-        // json_response = JSON.stringify(body)
-        // console.log('json_response: ', json_response)
-        // console.log(json_response.hub_id)
-        // var accessToken = this.authInfo.accessToken
-        // var refreshToken = this.authInfo.refreshToken
-        // User.findOrCreate({ email: json_response.user, hub_id:json_response.hub_id, access_token:accessToken, refresh_token: refreshToken }, function (err, user,created) {
-        //   return done(err, user);
-        // });
         return done(null, this.authInfo);
       } else {
         return done(error);
@@ -246,12 +239,6 @@ passport.use('hubspot', new OAuth2Strategy({
 ));
 
 app.post('/hubDeals', (req, res) => {
-
-  // if(fs.existsSync(__dirname + '/data/deals.json')) {
-  //   console.log('deals.json already exists, sending file');
-  //   res.status(200).send(fs.readFileSync(__dirname + '/data/deals.json'));
-  //   return
-  // }
   console.log('req bearer: ', req.body.authorization[0]);
   let token = req.body.authorization[0];
   let offset = '';
@@ -286,12 +273,7 @@ app.post('/hubDeals', (req, res) => {
               }
               readJSONFile(__dirname + '/data/deals.json')
                 .then(json => {
-                  // console.log('deals.json: ', json);
-                  // console.log('getCompanyIdsByDeals: ', getCompanyIdsByDeals);
                   const dealsObj = JSON.parse(json);
-                  // getCompanyIdsByDeals(dealsObj)
-                  // .then(res => console.log('getCompanyIdsByDeals(dealsObj) returned : ', res))
-                  // .catch(err => console.log('err in getCompanyIdsByDeals', err));
                 })
                 .catch(err => reject(console.log('file written err: ', err)))
             })
@@ -414,7 +396,6 @@ app.route('/hubCompanies')
               })
               tempCompaniesArr = flatten(tempCompaniesArr);
               const opportunityCompanies = _.chain(tempCompaniesArr).filter((o) => {
-                // console.log('o: ', o);
                 if (!o) {
                   return;
                 }
@@ -422,7 +403,6 @@ app.route('/hubCompanies')
               })
                 .map('companyId')
                 .value();
-              // console.log('tempCompaniesArr length: ', opportunityCompanies);
 
               getCompaniesInit(opportunityCompanies, options)
                 .then(companies => {
@@ -475,7 +455,7 @@ app.route('/hubDeleteProps')
       if (!property.startsWith('scope')) {
         return
       } else {
-        callAPI({ url: hubAPI + 'properties/v1/contacts/properties/named/' + property, headers }, (error, response, body) => {
+        callAPI({ url: hubAPI + HUBCONTACTSALL + property, headers }, (error, response, body) => {
           console.log('callAPI returned: ', body);
           if (error) {
             console.log('error: ', error);
@@ -492,8 +472,6 @@ app.route('/hubDeleteProps')
 
 app.route('/hubFormsPurge')
   .post((req, res) => {
-    const magHubFormId = '80cb8037-3adb-4652-9acc-136771a9b243';
-    const magPortalId = 510975;
     // build the data object
     const scopes = encodeURI(JSON.stringify([]));
     const email = req.body.email;
@@ -509,7 +487,7 @@ app.route('/hubFormsPurge')
     // set the post options, changing out the HUB ID and FORM GUID variables.
     var options = {
       hostname: 'forms.hubspot.com',
-      path: `/uploads/form/v2/${magPortalId}/${magHubFormId}`,
+      path: `/uploads/form/v2/${HUBPORTALID}/${HUBFORMID}`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -543,8 +521,6 @@ app.route('/hubFormsPurge')
 app.route('/hubFormsUpdate')
   .post((req, res) => {
     console.log('update req: ', req);
-    const magHubFormId = '80cb8037-3adb-4652-9acc-136771a9b243';
-    const magPortalId = 510975;
     const scopes = encodeURI(JSON.stringify(req.body.scopes));
     const email = req.body.email;
     // build the data object
@@ -559,7 +535,7 @@ app.route('/hubFormsUpdate')
     // set the post options, changing out the HUB ID and FORM GUID variables.
     var options = {
       hostname: 'forms.hubspot.com',
-      path: `/uploads/form/v2/${magPortalId}/${magHubFormId}`,
+      path: `/uploads/form/v2/${HUBPORTALID}/${HUBFORMID}`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

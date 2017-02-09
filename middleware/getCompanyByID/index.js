@@ -1,2 +1,2 @@
-const getCompanyInit = require('./getCompanyById');
+const getCompanyInit = require('./getCompanyByID');
 module.exports = getCompanyInit;
