@@ -1,4 +1,7 @@
-require('dotenv').config({ path: './config/.env' });
+if(process.env.NODE_ENV !== 'production') {
+  require('dotenv').config({ path: './config/.env' });
+}
+  
 const express = require('express');
 const request = require('request');
 const fs = require('fs');
