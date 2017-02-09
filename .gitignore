@@ -3,6 +3,7 @@ node_modules
 .vscode
 data
 scratch
+npm-debug.log
 
 # Sensitive information
 config/.env
