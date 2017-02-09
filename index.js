@@ -197,9 +197,9 @@ app.get('/hubAuth', passport.authenticate('hubspot', { session: false, scope: ['
 app.get('/auth/hubspot/callback', passport.authenticate('hubspot', { session: false }), (req, res) => {
   if (req.user) {
     // Save req.user to a local json file to cache
-    fs.writeFile(__dirname + 'data/token.json', JSON.stringify(req.user), err => {
+    fs.writeFile(__dirname + '/data/token.json', JSON.stringify(req.user), err => {
       if (err) throw err;
-      console.log('saved token: ', JSON.parse(fs.readFileSync(__dirname + 'data/token.json')));
+      console.log('saved token: ', JSON.parse(fs.readFileSync(__dirname + '/data/token.json')));
       res.redirect(303, (serverEnv === 'dev') ? 'http://localhost:3000/#/token' : 'http://mag.surge.sh/#/token');
     });
   } else {
