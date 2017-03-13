@@ -9,12 +9,12 @@ const app = express();
 const port = process.env.PORT || 1337;
 const hubSecret = process.env.HUBSPOTSECRET;
 const server = app.listen(port);
-const middleware = require('./middleware');
-const getDeals = middleware.getDeals;
-const readJSONFile = middleware.readJSONFile;
-const getCompanyIdsByDeals = middleware.getCompanyIdsByDeals;
-const getCompaniesInit = middleware.getCompaniesInit;
-const hubAuth = middleware.hubAuth;
+const services = require('./services');
+const getDeals = services.getDeals;
+const readJSONFile = services.readJSONFile;
+const getCompanyIdsByDeals = services.getCompanyIdsByDeals;
+const getCompaniesInit = services.getCompaniesInit;
+const hubAuth = services.hubAuth;
 const cors = require('cors');
 const https = require('https');
 // Hub constants
@@ -34,8 +34,8 @@ const HUBFORMID = process.env.HUBFORMID;
 const HUBPORTALID = process.env.HUBPORTALID;
 
 // Server Env. To share with others switch to 'staging'
-// const serverEnv = 'dev';
-const serverEnv = 'staging';
+const serverEnv = 'dev';
+// const serverEnv = 'staging';
 
 // Limit api calls to hubspot to adhere to limitaions(10 requests per second)
 const limit = require("simple-rate-limiter");
@@ -311,9 +311,7 @@ app.post('/hubDeal/:id', (req, res) => {
 
 app.route('/hubMe')
   .post((req, res) => {
-    console.log('req.headers: ', req.headers);
     let token = req.headers.authorization.replace('Bearer ', '');
-    console.log('/hubMe token: ', token)
     let options = {
       url: hubAPI + HUBME + token,
       headers: {
@@ -561,3 +559,8 @@ app.route('/hubFormsUpdate')
 
   })
 
+  app.route('/webHook')
+  .post((req, res) => {
+    console.log('req: ', req.body);
+    res.sendStatus(200);
+  });
